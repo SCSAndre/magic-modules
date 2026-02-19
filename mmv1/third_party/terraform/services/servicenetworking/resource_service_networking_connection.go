@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -59,7 +58,7 @@ func ResourceServiceNetworkingConnection() *schema.Resource {
 				Type:             schema.TypeList,
 				Required:         true,
 				Elem:             &schema.Schema{Type: schema.TypeString},
-				DiffSuppressFunc: stringListDiffSuppress,
+				DiffSuppressFunc: tpgresource.StringListDiffSuppress,
 				Description:      `Named IP address range(s) of PEERING type reserved for this service provider. Note that invoking this method with a different range when connection is already established will not reallocate already provisioned service producer subnetworks.`,
 			},
 			"deletion_policy": {
@@ -437,45 +436,4 @@ func formatParentService(service string) string {
 	} else {
 		return service
 	}
-}
-
-func stringListDiffSuppress(k, old, new string, d *schema.ResourceData) bool {
-	// The key (k) can be "reserved_peering_ranges", "reserved_peering_ranges.#", or "reserved_peering_ranges.0", etc.
-	// We want to check the *entire* list equality whenever any part of it is questioned.
-	root := "reserved_peering_ranges"
-
-	// If this key doesn't belong to our field, ignore it.
-	if k != root && !strings.HasPrefix(k, root+".") {
-		return false
-	}
-
-	// Get the full list values (Old and New) from the resource data
-	o, n := d.GetChange(root)
-
-	// Cast to generic lists
-	oldList, ok1 := o.([]interface{})
-	newList, ok2 := n.([]interface{})
-
-	// If casting fails or lengths differ, we definitely have a change, so don't suppress.
-	if !ok1 || !ok2 || len(oldList) != len(newList) {
-		return false
-	}
-
-	// Convert to string slices for sorting
-	oldStrs := make([]string, len(oldList))
-	for i, v := range oldList {
-		oldStrs[i] = fmt.Sprintf("%v", v)
-	}
-
-	newStrs := make([]string, len(newList))
-	for i, v := range newList {
-		newStrs[i] = fmt.Sprintf("%v", v)
-	}
-
-	// Sort both lists to compare content regardless of order
-	sort.Strings(oldStrs)
-	sort.Strings(newStrs)
-
-	// If the sorted lists are identical, return true to SUPPRESS the diff.
-	return reflect.DeepEqual(oldStrs, newStrs)
 }
